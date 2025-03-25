@@ -1,27 +1,20 @@
-/* styles.css - Estilos complementares */
 .hidden {
-    display: none !important;
+    display: none;
 }
 
-/* Efeito de shake para erros */
-.shake {
-    animation: shake 0.5s;
+/* Efeitos de hover e animações */
+#entriesList div:hover {
+    transform: translateY(-2px);
+    transition: transform 0.2s ease;
 }
 
-@keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    20%, 60% { transform: translateX(-5px); }
-    40%, 80% { transform: translateX(5px); }
-}
-
-/* Melhorias para mobile */
+/* Responsividade */
 @media (max-width: 640px) {
-    #authScreen {
-        margin-top: 2rem;
-        padding: 1.5rem;
+    #app {
+        padding: 1rem;
     }
     
-    #mainScreen {
+    #entryForm {
         padding: 1rem;
     }
 }
