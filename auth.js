@@ -1,14 +1,18 @@
+// auth.js - Sistema completo de autenticação (ÚNICO NECESSÁRIO)
 document.addEventListener('DOMContentLoaded', function() {
+    const auth = firebase.auth();
     const authScreen = document.getElementById('authScreen');
     const mainScreen = document.getElementById('mainScreen');
     const loginForm = document.getElementById('loginForm');
     const authMessage = document.getElementById('authMessage');
+    const userEmail = document.getElementById('userEmail');
 
     // Monitora estado de autenticação
-    firebase.auth().onAuthStateChanged(user => {
+    auth.onAuthStateChanged(user => {
         if (user) {
             authScreen.classList.add('hidden');
             mainScreen.classList.remove('hidden');
+            userEmail.textContent = user.email;
             console.log("Usuário logado:", user.email);
         } else {
             authScreen.classList.remove('hidden');
@@ -21,26 +25,33 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
-        
+
         try {
-            await firebase.auth().signInWithEmailAndPassword(email, password);
+            await auth.signInWithEmailAndPassword(email, password);
         } catch (error) {
-            showMessage(getErrorMessage(error));
+            showErrorMessage(error);
         }
     });
 
-    function showMessage(message) {
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+        auth.signOut();
+    });
+
+    // Mostra mensagens de erro
+    function showErrorMessage(error) {
+        let message = "Erro ao fazer login";
+        
+        switch (error.code) {
+            case 'auth/invalid-email': message = "E-mail inválido"; break;
+            case 'auth/user-not-found': message = "Usuário não encontrado"; break;
+            case 'auth/wrong-password': message = "Senha incorreta"; break;
+            case 'auth/too-many-requests': message = "Muitas tentativas. Tente mais tarde"; break;
+            default: message = error.message;
+        }
+
         authMessage.textContent = message;
         authMessage.classList.remove('hidden');
-        setTimeout(() => authMessage.classList.add('hidden'), 3000);
-    }
-
-    function getErrorMessage(error) {
-        switch (error.code) {
-            case 'auth/invalid-email': return "E-mail inválido";
-            case 'auth/user-not-found': return "Usuário não cadastrado";
-            case 'auth/wrong-password': return "Senha incorreta";
-            default: return "Erro ao fazer login";
-        }
+        setTimeout(() => authMessage.classList.add('hidden'), 5000);
     }
 });
