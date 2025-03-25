@@ -1,29 +1,54 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js";
 import { 
-  getFirestore, collection, addDoc, 
-  query, where, getDocs, deleteDoc, doc,
-  onSnapshot 
-} from "https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js";
-import { 
-  getAuth, createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, signOut, 
-  onAuthStateChanged 
+    getAuth,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut,
+    onAuthStateChanged,
+    updateProfile,
+    sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js";
+import { 
+    getFirestore,
+    collection,
+    addDoc,
+    query,
+    where,
+    getDocs,
+    deleteDoc,
+    doc,
+    onSnapshot
+} from "https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDCrKS17Fle4ycDbvD8lIFjndq1XVeDjEk", // SUA_API_KEY
-  authDomain: "diario-243fa.firebaseapp.com", // SEU_AUTH_DOMAIN
-  projectId: "diario-243fa", // SEU_PROJECT_ID
-  storageBucket: "diario-243fa.appspot.com", // SEU_STORAGE_BUCKET
-  messagingSenderId: "836464209379", // SEU_SENDER_ID
-  appId: "1:836464209379:web:c3e0484ad00636c18184d6" // SEU_APP_ID
+    apiKey: "AIzaSyDCrKS17Fle4ycDbvD8lIFjndq1XVeDjEk",
+    authDomain: "diario-243fa.firebaseapp.com",
+    projectId: "diario-243fa",
+    storageBucket: "diario-243fa.appspot.com",
+    messagingSenderId: "836464209379",
+    appId: "1:836464209379:web:c3e0484ad00636c18184d6"
 };
 
-// Inicializa o Firebase
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 const auth = getAuth(app);
+const db = getFirestore(app);
 
-export { db, auth, collection, addDoc, query, where, getDocs, deleteDoc, doc, 
-         createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, 
-         onAuthStateChanged, onSnapshot };
+export { 
+    auth, 
+    db,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut,
+    onAuthStateChanged,
+    updateProfile,
+    sendPasswordResetEmail,
+    collection,
+    addDoc,
+    query,
+    where,
+    getDocs,
+    deleteDoc,
+    doc,
+    onSnapshot
+};
