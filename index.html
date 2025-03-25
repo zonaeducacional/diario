@@ -1,120 +1,164 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Diário de Classe</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <div id="app" class="container mx-auto p-4">
-    <!-- Tela de Login -->
-    <div id="loginScreen" class="max-w-md mx-auto mt-10">
-      <form id="loginForm" class="space-y-4">
-        <input type="email" id="email" placeholder="E-mail" required class="w-full p-2 border rounded">
-        <input type="password" id="password" placeholder="Senha" required class="w-full p-2 border rounded">
-        <button type="submit" class="w-full bg-blue-500 text-white p-2 rounded">Entrar</button>
-      </form>
-    </div>
+import { 
+    auth, 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    signOut, 
+    onAuthStateChanged,
+    updateProfile,
+    sendPasswordResetEmail
+} from "./firebase.js";
 
-    <!-- Tela Principal -->
-    <div id="mainScreen" class="hidden">
-      <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold">Diário de Classe</h1>
-        <button id="logoutBtn" class="text-red-500">Sair</button>
-      </div>
-      
-      <!-- Formulário de Nova Anotação -->
-      <form id="entryForm" class="mb-8 space-y-4">
-        <!-- Campos do formulário aqui -->
-      </form>
-
-      <!-- Lista de Anotações -->
-      <div id="entriesList" class="space-y-4"></div>
-    </div>
-  </div>
-
-  <script type="module">
-    import { AuthManager } from './auth.js';
-    import { ClassDiary } from './diary.js';
-    import { auth } from './firebase.js';
-
-    // Controle de UI
-    const loginScreen = document.getElementById('loginScreen');
-    const mainScreen = document.getElementById('mainScreen');
-    const loginForm = document.getElementById('loginForm');
-    const logoutBtn = document.getElementById('logoutBtn');
-    const entryForm = document.getElementById('entryForm');
-    const entriesList = document.getElementById('entriesList');
-
-    // Gerenciamento de Estado
-    let currentUser = null;
-    let unsubscribeEntries = null;
-
-    // Event Listeners
-    loginForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      
-      try {
-        await AuthManager.login(email, password);
-      } catch (error) {
-        alert('Erro no login: ' + error.message);
-      }
-    });
-
-    logoutBtn.addEventListener('click', () => AuthManager.logout());
-
-    entryForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const entryData = {
-        date: document.getElementById('date').value,
-        class: document.getElementById('class').value,
-        subject: document.getElementById('subject').value,
-        content: document.getElementById('content').value,
-        homework: document.getElementById('homework').value,
-        observations: document.getElementById('observations').value,
-        teacherId: currentUser.uid,
-        createdAt: new Date().toISOString()
-      };
-
-      await ClassDiary.addEntry(entryData);
-      entryForm.reset();
-    });
-
-    // Monitora estado de autenticação
-    AuthManager.onAuthChange((user) => {
-      currentUser = user;
-      if (user) {
-        loginScreen.classList.add('hidden');
-        mainScreen.classList.remove('hidden');
-        loadEntries();
-      } else {
-        loginScreen.classList.remove('hidden');
-        mainScreen.classList.add('hidden');
-        if (unsubscribeEntries) unsubscribeEntries();
-      }
-    });
-
-    // Carrega anotações em tempo real
-    function loadEntries() {
-      unsubscribeEntries = ClassDiary.subscribeToEntries(currentUser.uid, (entries) => {
-        entriesList.innerHTML = entries.map(entry => `
-          <div class="p-4 border rounded-lg">
-            <h3 class="font-bold">${entry.subject} - ${entry.class}</h3>
-            <p>${entry.content}</p>
-            <button onclick="deleteEntry('${entry.id}')" class="text-red-500 mt-2">Excluir</button>
-          </div>
-        `).join('');
-      });
+export class AuthManager {
+    constructor() {
+        this.currentUser = null;
+        this.initAuthListeners();
+        this.bindAuthUIEvents();
     }
 
-    // Função global para deletar
-    window.deleteEntry = async (id) => {
-      if (confirm('Tem certeza?')) await ClassDiary.deleteEntry(id);
-    };
-  </script>
-</body>
-</html>
+    initAuthListeners() {
+        // Observa mudanças no estado de autenticação
+        onAuthStateChanged(auth, (user) => {
+            this.currentUser = user;
+            const authScreen = document.getElementById('authScreen');
+            const mainContent = document.getElementById('mainContent');
+            
+            if (user) {
+                // Usuário autenticado
+                authScreen.classList.add('hidden');
+                mainContent.classList.remove('hidden');
+                console.log("Usuário logado:", user.email);
+            } else {
+                // Usuário não autenticado
+                authScreen.classList.remove('hidden');
+                mainContent.classList.add('hidden');
+            }
+        });
+    }
+
+    bindAuthUIEvents() {
+        // Alternar entre login e registro
+        document.getElementById('loginTab').addEventListener('click', () => {
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('loginTab').classList.add('border-blue-500', 'text-blue-600');
+            document.getElementById('loginTab').classList.remove('text-gray-500');
+            document.getElementById('registerTab').classList.remove('border-blue-500', 'text-blue-600');
+            document.getElementById('registerTab').classList.add('text-gray-500');
+        });
+
+        document.getElementById('registerTab').addEventListener('click', () => {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+            document.getElementById('registerTab').classList.add('border-blue-500', 'text-blue-600');
+            document.getElementById('registerTab').classList.remove('text-gray-500');
+            document.getElementById('loginTab').classList.remove('border-blue-500', 'text-blue-600');
+            document.getElementById('loginTab').classList.add('text-gray-500');
+        });
+
+        // Login
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                this.showMessage('Login realizado com sucesso!', 'success');
+            } catch (error) {
+                this.handleAuthError(error);
+            }
+        });
+
+        // Registro
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('regName').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const confirmPassword = document.getElementById('regConfirmPassword').value;
+            
+            if (password !== confirmPassword) {
+                this.showMessage('As senhas não coincidem!', 'error');
+                return;
+            }
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                await updateProfile(userCredential.user, { displayName: name });
+                this.showMessage('Conta criada com sucesso!', 'success');
+                // Volta para o login após registro
+                document.getElementById('loginTab').click();
+            } catch (error) {
+                this.handleAuthError(error);
+            }
+        });
+
+        // Esqueceu a senha
+        document.getElementById('forgotPassword').addEventListener('click', async () => {
+            const email = prompt("Digite seu e-mail para redefinir a senha:");
+            if (email) {
+                try {
+                    await sendPasswordResetEmail(auth, email);
+                    this.showMessage('E-mail de redefinição enviado! Verifique sua caixa de entrada.', 'success');
+                } catch (error) {
+                    this.handleAuthError(error);
+                }
+            }
+        });
+    }
+
+    handleAuthError(error) {
+        console.error("Erro de autenticação:", error.code, error.message);
+        
+        let message = "Erro ao autenticar";
+        switch (error.code) {
+            case 'auth/invalid-login-credentials':
+            case 'auth/wrong-password':
+                message = "E-mail ou senha incorretos";
+                document.getElementById('loginPassword').classList.add('shake');
+                setTimeout(() => {
+                    document.getElementById('loginPassword').classList.remove('shake');
+                }, 500);
+                break;
+            case 'auth/user-not-found':
+                message = "Usuário não encontrado";
+                break;
+            case 'auth/email-already-in-use':
+                message = "E-mail já está em uso";
+                break;
+            case 'auth/weak-password':
+                message = "Senha muito fraca (mínimo 6 caracteres)";
+                break;
+            case 'auth/too-many-requests':
+                message = "Muitas tentativas. Tente novamente mais tarde";
+                break;
+            default:
+                message = error.message;
+        }
+        
+        this.showMessage(message, 'error');
+    }
+
+    showMessage(text, type) {
+        const messageDiv = document.getElementById('authMessage');
+        messageDiv.textContent = text;
+        messageDiv.classList.remove('hidden', 'text-red-500', 'text-green-500');
+        messageDiv.classList.add(type === 'error' ? 'text-red-500' : 'text-green-500');
+        
+        setTimeout(() => {
+            messageDiv.classList.add('hidden');
+        }, 5000);
+    }
+
+    async logout() {
+        try {
+            await signOut(auth);
+            this.showMessage('Logout realizado com sucesso', 'success');
+        } catch (error) {
+            this.handleAuthError(error);
+        }
+    }
+}
+
+// Inicializa o gerenciador de autenticação
+new AuthManager();
