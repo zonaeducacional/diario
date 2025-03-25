@@ -1,4 +1,4 @@
-// Configuração do Firebase (versão compatível)
+// Configuração do Firebase (compatible API)
 const firebaseConfig = {
   apiKey: "AIzaSyDCrKS17Fle4ycDbvD8lIFjndq1XVeDjEk",
   authDomain: "diario-243fa.firebaseapp.com",
@@ -8,7 +8,7 @@ const firebaseConfig = {
   appId: "1:836464209379:web:c3e0484ad00636c18184d6"
 };
 
-// Inicializa o Firebase
+// Inicialização
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
