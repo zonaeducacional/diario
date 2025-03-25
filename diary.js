@@ -1,47 +1,74 @@
 import { 
   db, collection, addDoc, query, 
-  where, getDocs, deleteDoc, doc, 
-  onSnapshot 
+  where, orderBy, onSnapshot, 
+  deleteDoc, doc, serverTimestamp 
 } from "./firebase.js";
 
 export class ClassDiary {
-  static async addEntry(entryData) {
-    const docRef = await addDoc(collection(db, "entries"), entryData);
-    return docRef.id;
+  static async addEntry(userId, content) {
+    try {
+      const docRef = await addDoc(collection(db, "entries"), {
+        userId,
+        content,
+        createdAt: serverTimestamp()
+      });
+      return docRef.id;
+    } catch (error) {
+      console.error("Erro ao adicionar anotação:", error);
+      throw error;
+    }
   }
 
-  static async getEntries(userId, filters = {}) {
-    let q = query(collection(db, "entries"), where("teacherId", "==", userId));
-    
-    if (filters.class) {
-      q = query(q, where("class", "==", filters.class));
-    }
-    
-    if (filters.month) {
-      const [year, month] = filters.month.split('-');
-      const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 0);
-      
-      q = query(
-        q,
-        where("date", ">=", startDate.toISOString().split('T')[0]),
-        where("date", "<=", endDate.toISOString().split('T')[0])
+  static async getEntries(userId) {
+    try {
+      const q = query(
+        collection(db, "entries"),
+        where("userId", "==", userId),
+        orderBy("createdAt", "desc")
       );
+      
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data() 
+      }));
+    } catch (error) {
+      console.error("Erro ao buscar anotações:", error);
+      throw error;
     }
-
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   }
 
   static async deleteEntry(entryId) {
-    await deleteDoc(doc(db, "entries", entryId));
+    try {
+      await deleteDoc(doc(db, "entries", entryId));
+    } catch (error) {
+      console.error("Erro ao deletar anotação:", error);
+      throw error;
+    }
   }
 
   static subscribeToEntries(userId, callback) {
-    const q = query(collection(db, "entries"), where("teacherId", "==", userId));
-    return onSnapshot(q, (snapshot) => {
-      const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      callback(entries);
-    });
+    try {
+      const q = query(
+        collection(db, "entries"),
+        where("userId", "==", userId),
+        orderBy("createdAt", "desc")
+      );
+      
+      return onSnapshot(q, (snapshot) => {
+        const entries = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+          // Convertendo timestamp para data legível
+          createdAt: doc.data().createdAt?.toDate() || new Date()
+        }));
+        callback(entries);
+      }, (error) => {
+        console.error("Erro no listener:", error);
+      });
+    } catch (error) {
+      console.error("Erro ao configurar listener:", error);
+      throw error;
+    }
   }
 }
