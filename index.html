@@ -1,164 +1,107 @@
-import { 
-    auth, 
-    createUserWithEmailAndPassword, 
-    signInWithEmailAndPassword, 
-    signOut, 
-    onAuthStateChanged,
-    updateProfile,
-    sendPasswordResetEmail
-} from "./firebase.js";
-
-export class AuthManager {
-    constructor() {
-        this.currentUser = null;
-        this.initAuthListeners();
-        this.bindAuthUIEvents();
-    }
-
-    initAuthListeners() {
-        // Observa mudanças no estado de autenticação
-        onAuthStateChanged(auth, (user) => {
-            this.currentUser = user;
-            const authScreen = document.getElementById('authScreen');
-            const mainContent = document.getElementById('mainContent');
-            
-            if (user) {
-                // Usuário autenticado
-                authScreen.classList.add('hidden');
-                mainContent.classList.remove('hidden');
-                console.log("Usuário logado:", user.email);
-            } else {
-                // Usuário não autenticado
-                authScreen.classList.remove('hidden');
-                mainContent.classList.add('hidden');
-            }
-        });
-    }
-
-    bindAuthUIEvents() {
-        // Alternar entre login e registro
-        document.getElementById('loginTab').addEventListener('click', () => {
-            document.getElementById('loginForm').classList.remove('hidden');
-            document.getElementById('registerForm').classList.add('hidden');
-            document.getElementById('loginTab').classList.add('border-blue-500', 'text-blue-600');
-            document.getElementById('loginTab').classList.remove('text-gray-500');
-            document.getElementById('registerTab').classList.remove('border-blue-500', 'text-blue-600');
-            document.getElementById('registerTab').classList.add('text-gray-500');
-        });
-
-        document.getElementById('registerTab').addEventListener('click', () => {
-            document.getElementById('loginForm').classList.add('hidden');
-            document.getElementById('registerForm').classList.remove('hidden');
-            document.getElementById('registerTab').classList.add('border-blue-500', 'text-blue-600');
-            document.getElementById('registerTab').classList.remove('text-gray-500');
-            document.getElementById('loginTab').classList.remove('border-blue-500', 'text-blue-600');
-            document.getElementById('loginTab').classList.add('text-gray-500');
-        });
-
-        // Login
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-            
-            try {
-                const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                this.showMessage('Login realizado com sucesso!', 'success');
-            } catch (error) {
-                this.handleAuthError(error);
-            }
-        });
-
-        // Registro
-        document.getElementById('registerForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const name = document.getElementById('regName').value;
-            const email = document.getElementById('regEmail').value;
-            const password = document.getElementById('regPassword').value;
-            const confirmPassword = document.getElementById('regConfirmPassword').value;
-            
-            if (password !== confirmPassword) {
-                this.showMessage('As senhas não coincidem!', 'error');
-                return;
-            }
-
-            try {
-                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                await updateProfile(userCredential.user, { displayName: name });
-                this.showMessage('Conta criada com sucesso!', 'success');
-                // Volta para o login após registro
-                document.getElementById('loginTab').click();
-            } catch (error) {
-                this.handleAuthError(error);
-            }
-        });
-
-        // Esqueceu a senha
-        document.getElementById('forgotPassword').addEventListener('click', async () => {
-            const email = prompt("Digite seu e-mail para redefinir a senha:");
-            if (email) {
-                try {
-                    await sendPasswordResetEmail(auth, email);
-                    this.showMessage('E-mail de redefinição enviado! Verifique sua caixa de entrada.', 'success');
-                } catch (error) {
-                    this.handleAuthError(error);
-                }
-            }
-        });
-    }
-
-    handleAuthError(error) {
-        console.error("Erro de autenticação:", error.code, error.message);
-        
-        let message = "Erro ao autenticar";
-        switch (error.code) {
-            case 'auth/invalid-login-credentials':
-            case 'auth/wrong-password':
-                message = "E-mail ou senha incorretos";
-                document.getElementById('loginPassword').classList.add('shake');
-                setTimeout(() => {
-                    document.getElementById('loginPassword').classList.remove('shake');
-                }, 500);
-                break;
-            case 'auth/user-not-found':
-                message = "Usuário não encontrado";
-                break;
-            case 'auth/email-already-in-use':
-                message = "E-mail já está em uso";
-                break;
-            case 'auth/weak-password':
-                message = "Senha muito fraca (mínimo 6 caracteres)";
-                break;
-            case 'auth/too-many-requests':
-                message = "Muitas tentativas. Tente novamente mais tarde";
-                break;
-            default:
-                message = error.message;
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diário de Classe Online</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .auth-screen { transition: opacity 0.3s ease; }
+        .auth-screen.hidden { opacity: 0; pointer-events: none; }
+        .shake { animation: shake 0.5s; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
         }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Tela de Autenticação -->
+    <div id="authScreen" class="auth-screen fixed inset-0 bg-white z-50 flex items-center justify-center px-4">
+        <div class="w-full max-w-md bg-white p-8 rounded-lg shadow-lg border border-gray-200">
+            <!-- Tabs -->
+            <div class="flex border-b mb-6">
+                <button id="loginTab" class="flex-1 py-2 font-medium border-b-2 border-blue-500 text-blue-600">Login</button>
+                <button id="registerTab" class="flex-1 py-2 font-medium text-gray-500">Registrar</button>
+            </div>
+            
+            <!-- Formulário de Login -->
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label for="loginEmail" class="block text-sm font-medium text-gray-700">E-mail</label>
+                    <input type="email" id="loginEmail" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                
+                <div>
+                    <label for="loginPassword" class="block text-sm font-medium text-gray-700">Senha</label>
+                    <input type="password" id="loginPassword" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                    Entrar
+                </button>
+                
+                <div class="text-center">
+                    <button type="button" id="forgotPassword" class="text-sm text-blue-600 hover:text-blue-800">
+                        Esqueceu a senha?
+                    </button>
+                </div>
+            </form>
+            
+            <!-- Formulário de Registro -->
+            <form id="registerForm" class="space-y-4 hidden">
+                <div>
+                    <label for="regName" class="block text-sm font-medium text-gray-700">Nome Completo</label>
+                    <input type="text" id="regName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                
+                <div>
+                    <label for="regEmail" class="block text-sm font-medium text-gray-700">E-mail</label>
+                    <input type="email" id="regEmail" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                
+                <div>
+                    <label for="regPassword" class="block text-sm font-medium text-gray-700">Senha (mínimo 6 caracteres)</label>
+                    <input type="password" id="regPassword" required minlength="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                
+                <div>
+                    <label for="regConfirmPassword" class="block text-sm font-medium text-gray-700">Confirmar Senha</label>
+                    <input type="password" id="regConfirmPassword" required minlength="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                
+                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                    Criar Conta
+                </button>
+            </form>
+            
+            <!-- Mensagens de erro -->
+            <div id="authMessage" class="mt-4 text-center text-sm hidden"></div>
+        </div>
+    </div>
+
+    <!-- Conteúdo Principal (oculto inicialmente) -->
+    <div id="mainContent" class="hidden container mx-auto px-4 py-8">
+        <header class="mb-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-blue-800">Diário de Classe</h1>
+                <p class="text-gray-600">Bem-vindo, <span id="userName"></span></p>
+            </div>
+            <button id="logoutBtn" class="text-gray-600 hover:text-gray-800">
+                <i class="fas fa-sign-out-alt mr-1"></i> Sair
+            </button>
+        </header>
         
-        this.showMessage(message, 'error');
-    }
+        <!-- Seu conteúdo do diário aqui -->
+    </div>
 
-    showMessage(text, type) {
-        const messageDiv = document.getElementById('authMessage');
-        messageDiv.textContent = text;
-        messageDiv.classList.remove('hidden', 'text-red-500', 'text-green-500');
-        messageDiv.classList.add(type === 'error' ? 'text-red-500' : 'text-green-500');
-        
-        setTimeout(() => {
-            messageDiv.classList.add('hidden');
-        }, 5000);
-    }
-
-    async logout() {
-        try {
-            await signOut(auth);
-            this.showMessage('Logout realizado com sucesso', 'success');
-        } catch (error) {
-            this.handleAuthError(error);
-        }
-    }
-}
-
-// Inicializa o gerenciador de autenticação
-new AuthManager();
+    <!-- Firebase e scripts -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="auth.js"></script>
+</body>
+</html>
