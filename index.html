@@ -3,105 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diário de Classe Online</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        .auth-screen { transition: opacity 0.3s ease; }
-        .auth-screen.hidden { opacity: 0; pointer-events: none; }
-        .shake { animation: shake 0.5s; }
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            20%, 60% { transform: translateX(-5px); }
-            40%, 80% { transform: translateX(5px); }
-        }
-    </style>
+    <title>Diário de Classe</title>
+    <link href="https://cdn.tailwindcss.com" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <!-- Tela de Autenticação -->
-    <div id="authScreen" class="auth-screen fixed inset-0 bg-white z-50 flex items-center justify-center px-4">
-        <div class="w-full max-w-md bg-white p-8 rounded-lg shadow-lg border border-gray-200">
-            <!-- Tabs -->
-            <div class="flex border-b mb-6">
-                <button id="loginTab" class="flex-1 py-2 font-medium border-b-2 border-blue-500 text-blue-600">Login</button>
-                <button id="registerTab" class="flex-1 py-2 font-medium text-gray-500">Registrar</button>
-            </div>
-            
-            <!-- Formulário de Login -->
+<body class="bg-gray-100">
+    <div id="app" class="container mx-auto p-4">
+        <!-- Tela de Login -->
+        <div id="authScreen" class="max-w-md mx-auto mt-10 bg-white p-8 rounded-lg shadow">
+            <h2 class="text-2xl font-bold text-center mb-6">Login</h2>
             <form id="loginForm" class="space-y-4">
-                <div>
-                    <label for="loginEmail" class="block text-sm font-medium text-gray-700">E-mail</label>
-                    <input type="email" id="loginEmail" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                </div>
-                
-                <div>
-                    <label for="loginPassword" class="block text-sm font-medium text-gray-700">Senha</label>
-                    <input type="password" id="loginPassword" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                </div>
-                
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
-                    Entrar
-                </button>
-                
-                <div class="text-center">
-                    <button type="button" id="forgotPassword" class="text-sm text-blue-600 hover:text-blue-800">
-                        Esqueceu a senha?
-                    </button>
-                </div>
+                <input type="email" id="email" placeholder="E-mail" required class="w-full p-2 border rounded">
+                <input type="password" id="password" placeholder="Senha" required class="w-full p-2 border rounded">
+                <button type="submit" class="w-full bg-blue-500 text-white p-2 rounded">Entrar</button>
             </form>
-            
-            <!-- Formulário de Registro -->
-            <form id="registerForm" class="space-y-4 hidden">
-                <div>
-                    <label for="regName" class="block text-sm font-medium text-gray-700">Nome Completo</label>
-                    <input type="text" id="regName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                </div>
-                
-                <div>
-                    <label for="regEmail" class="block text-sm font-medium text-gray-700">E-mail</label>
-                    <input type="email" id="regEmail" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                </div>
-                
-                <div>
-                    <label for="regPassword" class="block text-sm font-medium text-gray-700">Senha (mínimo 6 caracteres)</label>
-                    <input type="password" id="regPassword" required minlength="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                </div>
-                
-                <div>
-                    <label for="regConfirmPassword" class="block text-sm font-medium text-gray-700">Confirmar Senha</label>
-                    <input type="password" id="regConfirmPassword" required minlength="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                </div>
-                
-                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
-                    Criar Conta
-                </button>
-            </form>
-            
-            <!-- Mensagens de erro -->
-            <div id="authMessage" class="mt-4 text-center text-sm hidden"></div>
+            <div id="authMessage" class="mt-4 text-center text-red-500 hidden"></div>
+        </div>
+
+        <!-- Tela Principal (oculta inicialmente) -->
+        <div id="mainScreen" class="hidden">
+            <h1 class="text-2xl font-bold">Meu Diário</h1>
+            <!-- Conteúdo do diário aqui -->
         </div>
     </div>
 
-    <!-- Conteúdo Principal (oculto inicialmente) -->
-    <div id="mainContent" class="hidden container mx-auto px-4 py-8">
-        <header class="mb-8 flex justify-between items-center">
-            <div>
-                <h1 class="text-3xl font-bold text-blue-800">Diário de Classe</h1>
-                <p class="text-gray-600">Bem-vindo, <span id="userName"></span></p>
-            </div>
-            <button id="logoutBtn" class="text-gray-600 hover:text-gray-800">
-                <i class="fas fa-sign-out-alt mr-1"></i> Sair
-            </button>
-        </header>
-        
-        <!-- Seu conteúdo do diário aqui -->
-    </div>
-
-    <!-- Firebase e scripts -->
+    <!-- Firebase (versão compatível) -->
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
-    <script src="firebase-config.js"></script>
+    
+    <!-- Configuração -->
+    <script>
+        // Configuração do Firebase (substitua com seus dados)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDCrKS17Fle4ycDbvD8lIFjndq1XVeDjEk",
+            authDomain: "diario-243fa.firebaseapp.com",
+            projectId: "diario-243fa",
+            storageBucket: "diario-243fa.appspot.com",
+            messagingSenderId: "836464209379",
+            appId: "1:836464209379:web:c3e0484ad00636c18184d6"
+        };
+        
+        // Inicializa o Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+    </script>
+    
+    <!-- Aplicação -->
     <script src="auth.js"></script>
 </body>
 </html>
