@@ -91,49 +91,42 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Salvar nova anotação
-    entryForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const button = e.target.querySelector('button[type="submit"]');
-        const originalButtonText = button.innerHTML;
-        button.disabled = true;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+entryForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const button = e.target.querySelector('button[type="submit"]');
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
 
-        const entryDate = document.getElementById('entryDate').value;
-        const entrySubject = document.getElementById('entrySubject').value.trim();
-        const entryContent = document.getElementById('entryContent').value.trim();
-
-        if (!entryDate || !entrySubject || !entryContent) {
-            showMessage("Preencha todos os campos!", "error");
-            button.disabled = false;
-            button.innerHTML = originalButtonText;
-            return;
-        }
-
+    try {
         const newEntry = {
-            date: entryDate,
-            subject: entrySubject,
-            content: entryContent,
+            date: document.getElementById('entryDate').value,
+            subject: document.getElementById('entrySubject').value,
+            content: document.getElementById('entryContent').value,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             userId: auth.currentUser.uid
         };
 
-        debugLog('Tentando salvar anotação: ' + JSON.stringify(newEntry));
-
-        try {
-            const docRef = await db.collection("entries").add(newEntry);
-            debugLog(`Anotação salva com ID: ${docRef.id}`);
-            entryForm.reset();
-            document.getElementById('entryDate').valueAsDate = new Date();
-            showMessage("Anotação salva com sucesso!", "success");
-        } catch (error) {
-            debugLog(`Erro ao salvar: ${error.code} - ${error.message}`);
-            showMessage("Erro ao salvar anotação!", "error");
-        } finally {
-            button.disabled = false;
-            button.innerHTML = originalButtonText;
+        debugLog('Tentando salvar: ' + JSON.stringify(newEntry));
+        
+        // Adiciona com tratamento de erro específico
+        await db.collection("entries").add(newEntry);
+        showMessage("Anotação salva com sucesso!", "success");
+        entryForm.reset();
+        
+    } catch (error) {
+        debugLog(`Erro ao salvar: ${error.code} - ${error.message}`);
+        
+        if (error.code === 'permission-denied') {
+            showMessage("Sem permissão para salvar. Recarregue a página e tente novamente.", "error");
+        } else {
+            showMessage("Erro ao salvar anotação", "error");
         }
-    });
+    } finally {
+        button.disabled = false;
+        button.innerHTML = 'Salvar';
+    }
+});
 
     // Carregar anotações
     function loadEntries(userId) {
