@@ -1,13 +1,12 @@
-// Sistema de Diário Escolar - Versão Estável
+// Sistema de Diário Escolar - Versão Final Simplificada
 document.addEventListener('DOMContentLoaded', function() {
-    // 1. VERIFICAÇÃO INICIAL
+    // 1. Verificação do Firebase
     if (!firebase || !firebase.auth || !firebase.firestore) {
-        console.error("Firebase não carregado corretamente!");
-        alert("Erro: Firebase não foi carregado. Recarregue a página.");
+        alert("Erro: Biblioteca Firebase não carregada. Recarregue a página.");
         return;
     }
 
-    // 2. ELEMENTOS DA UI
+    // 2. Elementos da UI
     const auth = firebase.auth();
     const db = firebase.firestore();
     const authScreen = document.getElementById('authScreen');
@@ -16,49 +15,35 @@ document.addEventListener('DOMContentLoaded', function() {
     const entryForm = document.getElementById('entryForm');
     const entriesList = document.getElementById('entriesList');
 
-    // 3. SISTEMA DE MENSAGENS À PROVA DE FALHAS
-    const displayMessage = (text, type = "info") => {
+    // 3. Sistema de Mensagens (sem console debug)
+    const showMessage = (text, type = "info") => {
         // Remove mensagens anteriores
-        const oldMessages = document.querySelectorAll('.custom-message');
+        const oldMessages = document.querySelectorAll('.user-message');
         oldMessages.forEach(msg => msg.remove());
         
         // Cria nova mensagem
         const messageDiv = document.createElement('div');
-        messageDiv.className = `custom-message ${type}`;
-        messageDiv.innerHTML = `
-            <div class="message-content">
-                <span class="message-icon">${
-                    type === 'success' ? '✓' : 
-                    type === 'error' ? '✗' : 'i'
-                }</span>
-                <span>${text}</span>
-            </div>
-        `;
-        
-        // Estilos inline para garantir funcionamento
+        messageDiv.className = `user-message ${type}`;
         messageDiv.style.cssText = `
             position: fixed;
             top: 20px;
             right: 20px;
             padding: 12px 16px;
             border-radius: 4px;
-            background: ${
-                type === 'success' ? '#d4edda' :
-                type === 'error' ? '#f8d7da' :
-                '#d1ecf1'
-            };
-            color: ${
-                type === 'success' ? '#155724' :
-                type === 'error' ? '#721c24' :
-                '#0c5460'
-            };
-            border: 1px solid ${
-                type === 'success' ? '#c3e6cb' :
-                type === 'error' ? '#f5c6cb' :
-                '#bee5eb'
-            };
+            background: ${type === 'success' ? '#d4edda' : type === 'error' ? '#f8d7da' : '#d1ecf1'};
+            color: ${type === 'success' ? '#155724' : type === 'error' ? '#721c24' : '#0c5460'};
+            border: 1px solid ${type === 'success' ? '#c3e6cb' : type === 'error' ? '#f5c6cb' : '#bee5eb'};
             z-index: 1000;
             animation: fadeIn 0.3s;
+            display: flex;
+            align-items: center;
+        `;
+        
+        messageDiv.innerHTML = `
+            <span style="margin-right:8px">
+                ${type === 'success' ? '✓' : type === 'error' ? '✗' : 'i'}
+            </span>
+            ${text}
         `;
         
         document.body.appendChild(messageDiv);
@@ -70,43 +55,49 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 5000);
     };
 
-    // 4. FUNÇÕES PRINCIPAIS
+    // 4. Carregar Anotações
     const loadEntries = (userId) => {
-        console.log(`Carregando anotações para: ${userId}`);
-        entriesList.innerHTML = '<div class="loading">Carregando...</div>';
+        entriesList.innerHTML = '<div style="text-align:center;padding:20px">Carregando...</div>';
 
         db.collection("entries")
             .where("userId", "==", userId)
             .orderBy("createdAt", "desc")
             .onSnapshot(
                 (snapshot) => {
-                    console.log(`Dados recebidos: ${snapshot.size} itens`);
                     entriesList.innerHTML = '';
                     
+                    if (snapshot.empty) {
+                        entriesList.innerHTML = '<div style="text-align:center;padding:20px">Nenhuma anotação encontrada</div>';
+                        return;
+                    }
+
                     snapshot.forEach(doc => {
                         const entry = doc.data();
                         const entryElement = document.createElement('div');
-                        entryElement.className = 'entry';
+                        entryElement.style.cssText = `
+                            background: #fff;
+                            padding: 15px;
+                            margin-bottom: 10px;
+                            border-radius: 5px;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                        `;
                         entryElement.innerHTML = `
-                            <h3>${entry.subject || 'Sem matéria'}</h3>
+                            <h3 style="margin-top:0">${entry.subject || 'Sem matéria'}</h3>
                             <p>${entry.content || 'Sem conteúdo'}</p>
                             <small>${entry.date || 'Sem data'}</small>
-                            <button onclick="deleteEntry('${doc.id}')">Excluir</button>
+                            <button onclick="deleteEntry('${doc.id}')" style="float:right">Excluir</button>
                         `;
                         entriesList.appendChild(entryElement);
                     });
                 },
                 (error) => {
-                    console.error("Erro ao carregar:", error);
-                    displayMessage("Erro ao carregar anotações", "error");
+                    showMessage("Erro ao carregar anotações", "error");
                 }
             );
     };
 
-    // 5. EVENT LISTENERS
+    // 5. Event Listeners
     auth.onAuthStateChanged(user => {
-        console.log(`Estado alterado: ${user ? user.email : 'null'}`);
-        
         if (user) {
             authScreen.style.display = 'none';
             mainScreen.style.display = 'block';
@@ -119,25 +110,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = e.target.email.value;
-        const password = e.target.password.value;
+        const button = e.target.querySelector('button[type="submit"]');
+        button.disabled = true;
 
         try {
-            await auth.signInWithEmailAndPassword(email, password);
+            await auth.signInWithEmailAndPassword(
+                e.target.email.value,
+                e.target.password.value
+            );
         } catch (error) {
-            console.error("Erro no login:", error);
-            displayMessage(
+            showMessage(
                 error.code === 'auth/wrong-password' ? 'Senha incorreta' :
                 error.code === 'auth/user-not-found' ? 'Usuário não existe' :
                 'Erro ao fazer login',
                 "error"
             );
+        } finally {
+            button.disabled = false;
         }
     });
 
     entryForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const button = e.target.querySelector('button');
+        const button = e.target.querySelector('button[type="submit"]');
         button.disabled = true;
 
         try {
@@ -149,31 +144,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 userId: auth.currentUser.uid
             });
             
-            displayMessage("Anotação salva com sucesso!", "success");
+            showMessage("Anotação salva com sucesso!", "success");
             e.target.reset();
+            e.target.entryDate.valueAsDate = new Date();
         } catch (error) {
-            console.error("Erro ao salvar:", error);
-            displayMessage("Erro ao salvar anotação", "error");
+            showMessage("Erro ao salvar anotação", "error");
         } finally {
             button.disabled = false;
         }
     });
 
-    // 6. FUNÇÃO GLOBAL PARA EXCLUSÃO
+    // 6. Função Global para Excluir
     window.deleteEntry = async (id) => {
         if (confirm('Deseja excluir esta anotação?')) {
             try {
                 await db.collection("entries").doc(id).delete();
-                displayMessage("Anotação excluída!", "success");
+                showMessage("Anotação excluída!", "success");
             } catch (error) {
-                console.error("Erro ao excluir:", error);
-                displayMessage("Erro ao excluir", "error");
+                showMessage("Erro ao excluir anotação", "error");
             }
         }
     };
 
-    // 7. INICIALIZAÇÃO
-    console.log("Sistema pronto");
+    // 7. Inicialização
     if (entryForm && entryForm.entryDate) {
         entryForm.entryDate.valueAsDate = new Date();
     }
