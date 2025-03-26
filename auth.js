@@ -1,244 +1,180 @@
-// Sistema de Autenticação e Diário - Versão Final Corrigida
+// Sistema de Diário Escolar - Versão Estável
 document.addEventListener('DOMContentLoaded', function() {
-    // Verificação de inicialização do Firebase
+    // 1. VERIFICAÇÃO INICIAL
     if (!firebase || !firebase.auth || !firebase.firestore) {
-        console.error("Firebase não foi carregado corretamente!");
+        console.error("Firebase não carregado corretamente!");
+        alert("Erro: Firebase não foi carregado. Recarregue a página.");
         return;
     }
 
-    // Elementos da UI
+    // 2. ELEMENTOS DA UI
     const auth = firebase.auth();
     const db = firebase.firestore();
     const authScreen = document.getElementById('authScreen');
     const mainScreen = document.getElementById('mainScreen');
     const loginForm = document.getElementById('loginForm');
-    const userEmail = document.getElementById('userEmail');
     const entryForm = document.getElementById('entryForm');
     const entriesList = document.getElementById('entriesList');
 
-    // ======================
-    // FUNÇÃO SHOWMESSAGE FIXA
-    // ======================
-    const showMessage = (text, type = "info") => {
-        const colors = {
-            success: "green",
-            error: "red",
-            info: "blue"
-        };
+    // 3. SISTEMA DE MENSAGENS À PROVA DE FALHAS
+    const displayMessage = (text, type = "info") => {
+        // Remove mensagens anteriores
+        const oldMessages = document.querySelectorAll('.custom-message');
+        oldMessages.forEach(msg => msg.remove());
         
+        // Cria nova mensagem
         const messageDiv = document.createElement('div');
+        messageDiv.className = `custom-message ${type}`;
+        messageDiv.innerHTML = `
+            <div class="message-content">
+                <span class="message-icon">${
+                    type === 'success' ? '✓' : 
+                    type === 'error' ? '✗' : 'i'
+                }</span>
+                <span>${text}</span>
+            </div>
+        `;
+        
+        // Estilos inline para garantir funcionamento
         messageDiv.style.cssText = `
             position: fixed;
             top: 20px;
             right: 20px;
-            padding: 15px;
-            border-radius: 8px;
-            background-color: ${type === 'success' ? '#d1fae5' : 
-                           type === 'error' ? '#fee2e2' : '#dbeafe'};
-            color: ${type === 'success' ? '#065f46' : 
-                   type === 'error' ? '#b91c1c' : '#1e40af'};
-            border: 1px solid ${type === 'success' ? '#a7f3d0' : 
-                              type === 'error' ? '#fecaca' : '#bfdbfe'};
+            padding: 12px 16px;
+            border-radius: 4px;
+            background: ${
+                type === 'success' ? '#d4edda' :
+                type === 'error' ? '#f8d7da' :
+                '#d1ecf1'
+            };
+            color: ${
+                type === 'success' ? '#155724' :
+                type === 'error' ? '#721c24' :
+                '#0c5460'
+            };
+            border: 1px solid ${
+                type === 'success' ? '#c3e6cb' :
+                type === 'error' ? '#f5c6cb' :
+                '#bee5eb'
+            };
             z-index: 1000;
-            display: flex;
-            align-items: center;
+            animation: fadeIn 0.3s;
         `;
-        
-        const icon = type === 'success' ? '✅' : 
-                    type === 'error' ? '❌' : 'ℹ️';
-        
-        messageDiv.innerHTML = `${icon} <span style="margin-left: 10px;">${text}</span>`;
         
         document.body.appendChild(messageDiv);
         
+        // Remove após 5 segundos
         setTimeout(() => {
-            messageDiv.style.opacity = '0';
+            messageDiv.style.animation = 'fadeOut 0.3s';
             setTimeout(() => messageDiv.remove(), 300);
         }, 5000);
     };
 
-    // ======================
-    // FUNÇÕES AUXILIARES
-    // ======================
-    const debugLog = (message) => {
-        console.log(message);
-        if (!document.getElementById('debug-console')) {
-            const debugConsole = document.createElement('div');
-            debugConsole.id = 'debug-console';
-            debugConsole.style.cssText = `
-                position: fixed; bottom: 0; right: 0; 
-                background: rgba(0,0,0,0.8); color: white; 
-                padding: 10px; z-index: 1000; 
-                max-height: 200px; overflow: auto;
-                font-family: monospace; width: 300px;
-            `;
-            document.body.appendChild(debugConsole);
-        }
-        
-        const p = document.createElement('p');
-        p.textContent = message;
-        document.getElementById('debug-console').appendChild(p);
-    };
-
-    const formatDate = (date) => {
-        if (!date) return 'Data não disponível';
-        return new Date(date).toLocaleDateString('pt-BR');
-    };
-
-    const createEntryElement = (id, entry) => {
-        const element = document.createElement('div');
-        element.className = 'entry-card bg-white rounded-lg shadow-md p-5 mb-4 hover:shadow-lg transition';
-        element.innerHTML = `
-            <div class="flex justify-between items-start">
-                <div>
-                    <h3 class="font-bold text-lg text-gray-800">${entry.subject}</h3>
-                    <p class="text-sm text-gray-500 mt-1">
-                        <i class="far fa-calendar-alt mr-1"></i>
-                        ${entry.date || formatDate(entry.createdAt?.toDate())}
-                    </p>
-                </div>
-                <button onclick="deleteEntry('${id}')" 
-                        class="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50">
-                    <i class="fas fa-trash-alt"></i>
-                </button>
-            </div>
-            <div class="mt-3 text-gray-700 whitespace-pre-line">${entry.content}</div>
-        `;
-        return element;
-    };
-
-    // ======================
-    // FUNÇÕES PRINCIPAIS
-    // ======================
+    // 4. FUNÇÕES PRINCIPAIS
     const loadEntries = (userId) => {
-        debugLog(`Carregando anotações para usuário: ${userId}`);
-        entriesList.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-blue-500 text-2xl"></i></div>';
+        console.log(`Carregando anotações para: ${userId}`);
+        entriesList.innerHTML = '<div class="loading">Carregando...</div>';
 
         db.collection("entries")
             .where("userId", "==", userId)
             .orderBy("createdAt", "desc")
             .onSnapshot(
                 (snapshot) => {
-                    debugLog(`Snapshot recebido. ${snapshot.size} documentos.`);
-                    
-                    if (snapshot.empty) {
-                        entriesList.innerHTML = `
-                            <div class="bg-blue-50 border border-blue-100 rounded-lg p-4 text-center">
-                                <i class="fas fa-book-open text-blue-400 text-2xl mb-2"></i>
-                                <p class="text-gray-500">Nenhuma anotação encontrada.</p>
-                            </div>
-                        `;
-                        return;
-                    }
-
+                    console.log(`Dados recebidos: ${snapshot.size} itens`);
                     entriesList.innerHTML = '';
-                    snapshot.docs.forEach(doc => {
+                    
+                    snapshot.forEach(doc => {
                         const entry = doc.data();
-                        entriesList.appendChild(createEntryElement(doc.id, entry));
+                        const entryElement = document.createElement('div');
+                        entryElement.className = 'entry';
+                        entryElement.innerHTML = `
+                            <h3>${entry.subject || 'Sem matéria'}</h3>
+                            <p>${entry.content || 'Sem conteúdo'}</p>
+                            <small>${entry.date || 'Sem data'}</small>
+                            <button onclick="deleteEntry('${doc.id}')">Excluir</button>
+                        `;
+                        entriesList.appendChild(entryElement);
                     });
                 },
                 (error) => {
-                    debugLog(`Erro no listener: ${error.message}`);
-                    showMessage("Erro ao carregar anotações", "error");
+                    console.error("Erro ao carregar:", error);
+                    displayMessage("Erro ao carregar anotações", "error");
                 }
             );
     };
 
-    // ======================
-    // EVENT LISTENERS
-    // ======================
-    auth.onAuthStateChanged((user) => {
-        debugLog(`Estado de autenticação alterado: ${user ? user.email : 'null'}`);
+    // 5. EVENT LISTENERS
+    auth.onAuthStateChanged(user => {
+        console.log(`Estado alterado: ${user ? user.email : 'null'}`);
         
         if (user) {
-            authScreen.classList.add('hidden');
-            mainScreen.classList.remove('hidden');
-            userEmail.textContent = user.email;
+            authScreen.style.display = 'none';
+            mainScreen.style.display = 'block';
             loadEntries(user.uid);
         } else {
-            authScreen.classList.remove('hidden');
-            mainScreen.classList.add('hidden');
+            authScreen.style.display = 'block';
+            mainScreen.style.display = 'none';
         }
     });
 
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const email = document.getElementById('email').value.trim();
-        const password = document.getElementById('password').value;
+        const email = e.target.email.value;
+        const password = e.target.password.value;
 
         try {
-            debugLog(`Tentando login com: ${email}`);
             await auth.signInWithEmailAndPassword(email, password);
         } catch (error) {
-            debugLog(`Erro no login: ${error.code} - ${error.message}`);
-            showMessage(
+            console.error("Erro no login:", error);
+            displayMessage(
                 error.code === 'auth/wrong-password' ? 'Senha incorreta' :
-                error.code === 'auth/user-not-found' ? 'Usuário não encontrado' :
+                error.code === 'auth/user-not-found' ? 'Usuário não existe' :
                 'Erro ao fazer login',
                 "error"
             );
         }
     });
 
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-        debugLog('Usuário solicitou logout');
-        auth.signOut();
-    });
-
     entryForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
-        const button = e.target.querySelector('button[type="submit"]');
-        const originalText = button.innerHTML;
+        const button = e.target.querySelector('button');
         button.disabled = true;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
 
         try {
-            const newEntry = {
-                date: document.getElementById('entryDate').value,
-                subject: document.getElementById('entrySubject').value,
-                content: document.getElementById('entryContent').value,
+            await db.collection("entries").add({
+                date: e.target.entryDate.value,
+                subject: e.target.entrySubject.value,
+                content: e.target.entryContent.value,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 userId: auth.currentUser.uid
-            };
-
-            debugLog(`Tentando salvar anotação: ${JSON.stringify(newEntry)}`);
-            const docRef = await db.collection("entries").add(newEntry);
-            debugLog(`Anotação salva com ID: ${docRef.id}`);
+            });
             
-            showMessage("Anotação salva com sucesso!", "success");
-            entryForm.reset();
-            document.getElementById('entryDate').valueAsDate = new Date();
-            
+            displayMessage("Anotação salva com sucesso!", "success");
+            e.target.reset();
         } catch (error) {
-            debugLog(`Erro ao salvar: ${error.message}`);
-            showMessage("Erro ao salvar anotação", "error");
+            console.error("Erro ao salvar:", error);
+            displayMessage("Erro ao salvar anotação", "error");
         } finally {
             button.disabled = false;
-            button.innerHTML = originalText;
         }
     });
 
-    // ======================
-    // FUNÇÃO GLOBAL DELETE
-    // ======================
-    window.deleteEntry = async (entryId) => {
-        if (confirm('Tem certeza que deseja excluir esta anotação?')) {
+    // 6. FUNÇÃO GLOBAL PARA EXCLUSÃO
+    window.deleteEntry = async (id) => {
+        if (confirm('Deseja excluir esta anotação?')) {
             try {
-                await db.collection("entries").doc(entryId).delete();
-                showMessage("Anotação excluída com sucesso!", "success");
+                await db.collection("entries").doc(id).delete();
+                displayMessage("Anotação excluída!", "success");
             } catch (error) {
-                debugLog(`Erro ao excluir: ${error.message}`);
-                showMessage("Erro ao excluir anotação", "error");
+                console.error("Erro ao excluir:", error);
+                displayMessage("Erro ao excluir", "error");
             }
         }
     };
 
-    // ======================
-    // INICIALIZAÇÃO
-    // ======================
-    if (document.getElementById('entryDate')) {
-        document.getElementById('entryDate').valueAsDate = new Date();
+    // 7. INICIALIZAÇÃO
+    console.log("Sistema pronto");
+    if (entryForm && entryForm.entryDate) {
+        entryForm.entryDate.valueAsDate = new Date();
     }
-    debugLog('Sistema iniciado. Aguardando autenticação...');
 });
