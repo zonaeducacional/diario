@@ -1,4 +1,4 @@
-// Sistema de Diário Escolar - Versão Final Simplificada
+// Sistema de Diário de Classe Completo
 document.addEventListener('DOMContentLoaded', function() {
     // 1. Verificação do Firebase
     if (!firebase || !firebase.auth || !firebase.firestore) {
@@ -14,48 +14,78 @@ document.addEventListener('DOMContentLoaded', function() {
     const loginForm = document.getElementById('loginForm');
     const entryForm = document.getElementById('entryForm');
     const entriesList = document.getElementById('entriesList');
+    const userEmail = document.getElementById('userEmail');
 
-    // 3. Sistema de Mensagens (sem console debug)
+    // 3. Sistema de Mensagens
     const showMessage = (text, type = "info") => {
-        // Remove mensagens anteriores
         const oldMessages = document.querySelectorAll('.user-message');
         oldMessages.forEach(msg => msg.remove());
         
-        // Cria nova mensagem
         const messageDiv = document.createElement('div');
-        messageDiv.className = `user-message ${type}`;
+        messageDiv.className = 'user-message';
         messageDiv.style.cssText = `
             position: fixed;
             top: 20px;
-            right: 20px;
-            padding: 12px 16px;
-            border-radius: 4px;
-            background: ${type === 'success' ? '#d4edda' : type === 'error' ? '#f8d7da' : '#d1ecf1'};
-            color: ${type === 'success' ? '#155724' : type === 'error' ? '#721c24' : '#0c5460'};
-            border: 1px solid ${type === 'success' ? '#c3e6cb' : type === 'error' ? '#f5c6cb' : '#bee5eb'};
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 400px;
+            padding: 15px;
+            border-radius: 8px;
+            background: ${type === 'success' ? '#4CAF50' : 
+                        type === 'error' ? '#F44336' : 
+                        '#2196F3'};
+            color: white;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
             z-index: 1000;
             animation: fadeIn 0.3s;
+            font-size: 16px;
             display: flex;
+            justify-content: center;
             align-items: center;
         `;
         
+        const icon = type === 'success' ? '✓' : 
+                     type === 'error' ? '✗' : 
+                     'ℹ️';
+        
         messageDiv.innerHTML = `
-            <span style="margin-right:8px">
-                ${type === 'success' ? '✓' : type === 'error' ? '✗' : 'i'}
-            </span>
-            ${text}
+            <span style="margin-right:12px;font-size:20px">${icon}</span>
+            <span>${text}</span>
         `;
         
         document.body.appendChild(messageDiv);
         
-        // Remove após 5 segundos
         setTimeout(() => {
             messageDiv.style.animation = 'fadeOut 0.3s';
             setTimeout(() => messageDiv.remove(), 300);
         }, 5000);
     };
 
-    // 4. Carregar Anotações
+    // 4. Função para criar elementos de entrada
+    const createEntryElement = (id, entry) => {
+        const element = document.createElement('div');
+        element.className = 'entry-card';
+        element.innerHTML = `
+            <div class="entry-header">
+                <h3>${entry.subject || 'Sem disciplina'}</h3>
+                <button onclick="deleteEntry('${id}')">Excluir</button>
+            </div>
+            <div class="entry-meta">
+                <span><strong>Data:</strong> ${entry.date || 'Não especificada'}</span>
+                <span><strong>Série:</strong> ${entry.grade || 'Não especificada'}</span>
+                <span><strong>Professor:</strong> ${entry.teacher || 'Não especificado'}</span>
+                <span><strong>Aulas:</strong> ${entry.classes || 1}</span>
+            </div>
+            <div class="entry-content">
+                ${entry.content || 'Sem conteúdo'}
+            </div>
+        `;
+        return element;
+    };
+
+    // 5. Carregar Anotações
     const loadEntries = (userId) => {
         entriesList.innerHTML = '<div style="text-align:center;padding:20px">Carregando...</div>';
 
@@ -67,27 +97,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     entriesList.innerHTML = '';
                     
                     if (snapshot.empty) {
-                        entriesList.innerHTML = '<div style="text-align:center;padding:20px">Nenhuma anotação encontrada</div>';
+                        entriesList.innerHTML = '<div class="no-entries">Nenhuma anotação encontrada</div>';
                         return;
                     }
 
                     snapshot.forEach(doc => {
-                        const entry = doc.data();
-                        const entryElement = document.createElement('div');
-                        entryElement.style.cssText = `
-                            background: #fff;
-                            padding: 15px;
-                            margin-bottom: 10px;
-                            border-radius: 5px;
-                            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                        `;
-                        entryElement.innerHTML = `
-                            <h3 style="margin-top:0">${entry.subject || 'Sem matéria'}</h3>
-                            <p>${entry.content || 'Sem conteúdo'}</p>
-                            <small>${entry.date || 'Sem data'}</small>
-                            <button onclick="deleteEntry('${doc.id}')" style="float:right">Excluir</button>
-                        `;
-                        entriesList.appendChild(entryElement);
+                        entriesList.appendChild(createEntryElement(doc.id, doc.data()));
                     });
                 },
                 (error) => {
@@ -96,11 +111,12 @@ document.addEventListener('DOMContentLoaded', function() {
             );
     };
 
-    // 5. Event Listeners
+    // 6. Event Listeners
     auth.onAuthStateChanged(user => {
         if (user) {
             authScreen.style.display = 'none';
             mainScreen.style.display = 'block';
+            userEmail.textContent = user.email;
             loadEntries(user.uid);
         } else {
             authScreen.style.display = 'block';
@@ -110,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const button = e.target.querySelector('button[type="submit"]');
+        const button = e.target.querySelector('button');
         button.disabled = true;
 
         try {
@@ -136,17 +152,21 @@ document.addEventListener('DOMContentLoaded', function() {
         button.disabled = true;
 
         try {
-            await db.collection("entries").add({
-                date: e.target.entryDate.value,
-                subject: e.target.entrySubject.value,
-                content: e.target.entryContent.value,
+            const newEntry = {
+                date: document.getElementById('entryDate').value,
+                grade: document.getElementById('entryGrade').value,
+                subject: document.getElementById('entrySubject').value,
+                teacher: document.getElementById('entryTeacher').value,
+                classes: parseInt(document.getElementById('entryClasses').value),
+                content: document.getElementById('entryContent').value,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                 userId: auth.currentUser.uid
-            });
-            
+            };
+
+            await db.collection("entries").add(newEntry);
             showMessage("Anotação salva com sucesso!", "success");
-            e.target.reset();
-            e.target.entryDate.valueAsDate = new Date();
+            entryForm.reset();
+            document.getElementById('entryDate').valueAsDate = new Date();
         } catch (error) {
             showMessage("Erro ao salvar anotação", "error");
         } finally {
@@ -154,19 +174,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // 6. Função Global para Excluir
+    // 7. Função Global para Exclusão
     window.deleteEntry = async (id) => {
         if (confirm('Deseja excluir esta anotação?')) {
             try {
                 await db.collection("entries").doc(id).delete();
-                showMessage("Anotação excluída!", "success");
+                showMessage("Anotação excluída com sucesso!", "success");
             } catch (error) {
                 showMessage("Erro ao excluir anotação", "error");
             }
         }
     };
 
-    // 7. Inicialização
+    // 8. Inicialização
     if (entryForm && entryForm.entryDate) {
         entryForm.entryDate.valueAsDate = new Date();
     }
