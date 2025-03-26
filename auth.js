@@ -124,27 +124,45 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    loginForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const button = e.target.querySelector('button');
-        button.disabled = true;
+  // Função de login melhorada
+loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const button = e.target.querySelector('button');
+    const email = e.target.email.value.trim();
+    const password = e.target.password.value;
 
-        try {
-            await auth.signInWithEmailAndPassword(
-                e.target.email.value,
-                e.target.password.value
-            );
-        } catch (error) {
-            showMessage(
-                error.code === 'auth/wrong-password' ? 'Senha incorreta' :
-                error.code === 'auth/user-not-found' ? 'Usuário não existe' :
-                'Erro ao fazer login',
-                "error"
-            );
-        } finally {
-            button.disabled = false;
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Entrando...';
+
+    try {
+        debugLog(`Tentando login com: ${email}`);
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        
+        // Verificação adicional
+        if (userCredential.user) {
+            debugLog(`Login bem-sucedido: ${userCredential.user.email}`);
+            showMessage("Login realizado com sucesso!", "success");
+        } else {
+            throw new Error("Credenciais inválidas");
         }
-    });
+    } catch (error) {
+        debugLog(`Erro no login: ${error.code || error.message}`);
+        
+        let message = "Erro ao fazer login";
+        if (error.code === 'auth/user-not-found') {
+            message = "Usuário não encontrado";
+        } else if (error.code === 'auth/wrong-password') {
+            message = "Senha incorreta";
+        } else if (error.code === 'auth/too-many-requests') {
+            message = "Muitas tentativas. Tente mais tarde";
+        }
+
+        showMessage(message, "error");
+    } finally {
+        button.disabled = false;
+        button.innerHTML = 'Entrar';
+    }
+});
 
     entryForm.addEventListener('submit', async (e) => {
         e.preventDefault();
