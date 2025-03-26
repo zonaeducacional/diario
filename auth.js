@@ -1,164 +1,180 @@
-// Versão 100% testada - Sistema de Diário de Classe
+// Sistema de Diário Escolar - Versão Estável
 document.addEventListener('DOMContentLoaded', function() {
-    // 1. Verificação robusta do Firebase
-    if (typeof firebase === 'undefined' || 
-        typeof firebase.auth === 'undefined' || 
-        typeof firebase.firestore === 'undefined') {
-        alert("ERRO: Firebase não foi carregado corretamente.\n\nPor favor:\n1. Verifique sua conexão com a internet\n2. Recarregue a página\n3. Se persistir, contate o suporte");
+    // 1. VERIFICAÇÃO INICIAL
+    if (!firebase || !firebase.auth || !firebase.firestore) {
+        console.error("Firebase não carregado corretamente!");
+        alert("Erro: Firebase não foi carregado. Recarregue a página.");
         return;
     }
 
-    // 2. Elementos da UI com verificação
+    // 2. ELEMENTOS DA UI
     const auth = firebase.auth();
     const db = firebase.firestore();
-    
     const authScreen = document.getElementById('authScreen');
     const mainScreen = document.getElementById('mainScreen');
     const loginForm = document.getElementById('loginForm');
     const entryForm = document.getElementById('entryForm');
     const entriesList = document.getElementById('entriesList');
-    const userEmail = document.getElementById('userEmail');
 
-    if (!authScreen || !mainScreen || !loginForm || !entryForm || !entriesList) {
-        console.error("Elementos HTML essenciais não encontrados!");
-        return;
-    }
-
-    // 3. Sistema de Mensagens à prova de falhas
-    const showMessage = (text, type = "info") => {
-        try {
-            // Remove mensagens anteriores de forma segura
-            document.querySelectorAll('.user-message').forEach(msg => {
-                if (msg.parentNode) msg.parentNode.removeChild(msg);
-            });
-
-            // Cria nova mensagem
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'user-message';
-            
-            // Configuração de estilos
-            const styles = {
-                position: 'fixed',
-                top: '20px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: '90%',
-                maxWidth: '400px',
-                padding: '15px',
-                borderRadius: '8px',
-                backgroundColor: type === 'success' ? '#4CAF50' : 
-                              type === 'error' ? '#F44336' : '#2196F3',
-                color: 'white',
-                textAlign: 'center',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-                zIndex: '1000',
-                fontSize: '16px',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                animation: 'fadeIn 0.3s'
-            };
-
-            Object.assign(messageDiv.style, styles);
-
-            // Conteúdo da mensagem
-            const icon = type === 'success' ? '✓' : 
-                        type === 'error' ? '✗' : 'ℹ️';
-            
-            messageDiv.innerHTML = `
-                <span style="margin-right:12px;font-size:20px">${icon}</span>
+    // 3. SISTEMA DE MENSAGENS À PROVA DE FALHAS
+    const displayMessage = (text, type = "info") => {
+        // Remove mensagens anteriores
+        const oldMessages = document.querySelectorAll('.custom-message');
+        oldMessages.forEach(msg => msg.remove());
+        
+        // Cria nova mensagem
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `custom-message ${type}`;
+        messageDiv.innerHTML = `
+            <div class="message-content">
+                <span class="message-icon">${
+                    type === 'success' ? '✓' : 
+                    type === 'error' ? '✗' : 'i'
+                }</span>
                 <span>${text}</span>
-            `;
-
-            // Adiciona ao DOM
-            document.body.appendChild(messageDiv);
-            
-            // Remove após 5 segundos
-            setTimeout(() => {
-                messageDiv.style.animation = 'fadeOut 0.3s';
-                setTimeout(() => {
-                    if (messageDiv.parentNode) {
-                        messageDiv.parentNode.removeChild(messageDiv);
-                    }
-                }, 300);
-            }, 5000);
-        } catch (e) {
-            console.error("Erro no sistema de mensagens:", e);
-        }
+            </div>
+        `;
+        
+        // Estilos inline para garantir funcionamento
+        messageDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 16px;
+            border-radius: 4px;
+            background: ${
+                type === 'success' ? '#d4edda' :
+                type === 'error' ? '#f8d7da' :
+                '#d1ecf1'
+            };
+            color: ${
+                type === 'success' ? '#155724' :
+                type === 'error' ? '#721c24' :
+                '#0c5460'
+            };
+            border: 1px solid ${
+                type === 'success' ? '#c3e6cb' :
+                type === 'error' ? '#f5c6cb' :
+                '#bee5eb'
+            };
+            z-index: 1000;
+            animation: fadeIn 0.3s;
+        `;
+        
+        document.body.appendChild(messageDiv);
+        
+        // Remove após 5 segundos
+        setTimeout(() => {
+            messageDiv.style.animation = 'fadeOut 0.3s';
+            setTimeout(() => messageDiv.remove(), 300);
+        }, 5000);
     };
 
-    // 4. Função de Login Ultra Reforçada
-    loginForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
+    // 4. FUNÇÕES PRINCIPAIS
+    const loadEntries = (userId) => {
+        console.log(`Carregando anotações para: ${userId}`);
+        entriesList.innerHTML = '<div class="loading">Carregando...</div>';
+
+        db.collection("entries")
+            .where("userId", "==", userId)
+            .orderBy("createdAt", "desc")
+            .onSnapshot(
+                (snapshot) => {
+                    console.log(`Dados recebidos: ${snapshot.size} itens`);
+                    entriesList.innerHTML = '';
+                    
+                    snapshot.forEach(doc => {
+                        const entry = doc.data();
+                        const entryElement = document.createElement('div');
+                        entryElement.className = 'entry';
+                        entryElement.innerHTML = `
+                            <h3>${entry.subject || 'Sem matéria'}</h3>
+                            <p>${entry.content || 'Sem conteúdo'}</p>
+                            <small>${entry.date || 'Sem data'}</small>
+                            <button onclick="deleteEntry('${doc.id}')">Excluir</button>
+                        `;
+                        entriesList.appendChild(entryElement);
+                    });
+                },
+                (error) => {
+                    console.error("Erro ao carregar:", error);
+                    displayMessage("Erro ao carregar anotações", "error");
+                }
+            );
+    };
+
+    // 5. EVENT LISTENERS
+    auth.onAuthStateChanged(user => {
+        console.log(`Estado alterado: ${user ? user.email : 'null'}`);
         
-        const emailInput = this.email;
-        const passwordInput = this.password;
-        const submitButton = this.querySelector('button[type="submit"]');
-        
-        if (!emailInput || !passwordInput || !submitButton) {
-            showMessage("Formulário incompleto", "error");
-            return;
-        }
-
-        const email = emailInput.value.trim();
-        const password = passwordInput.value;
-
-        // Validação básica
-        if (!email || !password) {
-            showMessage("Preencha todos os campos", "error");
-            return;
-        }
-
-        // Salva estado original do botão
-        const originalButtonText = submitButton.innerHTML;
-        submitButton.disabled = true;
-        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Entrando...';
-
-        try {
-            console.log("Tentando login com:", email);
-            const userCredential = await auth.signInWithEmailAndPassword(email, password);
-            
-            if (!userCredential || !userCredential.user) {
-                throw new Error("Autenticação falhou - Sem dados de usuário");
-            }
-
-            console.log("Login bem-sucedido para:", userCredential.user.email);
-            showMessage("Login realizado com sucesso!", "success");
-            
-        } catch (error) {
-            console.error("Falha no login:", error);
-            
-            const errorMap = {
-                'auth/invalid-email': "Email inválido",
-                'auth/user-disabled': "Conta desativada",
-                'auth/user-not-found': "Usuário não encontrado",
-                'auth/wrong-password': "Senha incorreta",
-                'auth/too-many-requests': "Muitas tentativas. Tente mais tarde",
-                'auth/network-request-failed': "Falha na rede. Verifique sua conexão"
-            };
-
-            showMessage(errorMap[error.code] || "Erro ao fazer login. Tente novamente.", "error");
-            
-        } finally {
-            if (submitButton) {
-                submitButton.disabled = false;
-                submitButton.innerHTML = originalButtonText;
-            }
+        if (user) {
+            authScreen.style.display = 'none';
+            mainScreen.style.display = 'block';
+            loadEntries(user.uid);
+        } else {
+            authScreen.style.display = 'block';
+            mainScreen.style.display = 'none';
         }
     });
 
-    // ... (restante do código permanece igual)
-    // [Manter as funções createEntryElement, loadEntries, etc.]
-});
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = e.target.email.value;
+        const password = e.target.password.value;
 
-// CSS para as animações (adicione no seu arquivo CSS)
-<style>
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translate(-50%, -20px); }
-        to { opacity: 1; transform: translate(-50%, 0); }
+        try {
+            await auth.signInWithEmailAndPassword(email, password);
+        } catch (error) {
+            console.error("Erro no login:", error);
+            displayMessage(
+                error.code === 'auth/wrong-password' ? 'Senha incorreta' :
+                error.code === 'auth/user-not-found' ? 'Usuário não existe' :
+                'Erro ao fazer login',
+                "error"
+            );
+        }
+    });
+
+    entryForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const button = e.target.querySelector('button');
+        button.disabled = true;
+
+        try {
+            await db.collection("entries").add({
+                date: e.target.entryDate.value,
+                subject: e.target.entrySubject.value,
+                content: e.target.entryContent.value,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                userId: auth.currentUser.uid
+            });
+            
+            displayMessage("Anotação salva com sucesso!", "success");
+            e.target.reset();
+        } catch (error) {
+            console.error("Erro ao salvar:", error);
+            displayMessage("Erro ao salvar anotação", "error");
+        } finally {
+            button.disabled = false;
+        }
+    });
+
+    // 6. FUNÇÃO GLOBAL PARA EXCLUSÃO
+    window.deleteEntry = async (id) => {
+        if (confirm('Deseja excluir esta anotação?')) {
+            try {
+                await db.collection("entries").doc(id).delete();
+                displayMessage("Anotação excluída!", "success");
+            } catch (error) {
+                console.error("Erro ao excluir:", error);
+                displayMessage("Erro ao excluir", "error");
+            }
+        }
+    };
+
+    // 7. INICIALIZAÇÃO
+    console.log("Sistema pronto");
+    if (entryForm && entryForm.entryDate) {
+        entryForm.entryDate.valueAsDate = new Date();
     }
-    @keyframes fadeOut {
-        from { opacity: 1; }
-        to { opacity: 0; }
-    }
-</style>
+});
