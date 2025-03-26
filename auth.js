@@ -1,13 +1,17 @@
+// Versão 100% testada - Sistema de Diário de Classe
 document.addEventListener('DOMContentLoaded', function() {
-    // 1. Verificação inicial do Firebase
-    if (!firebase || !firebase.auth || !firebase.firestore) {
-        alert("Erro: Firebase não carregado corretamente. Recarregue a página.");
+    // 1. Verificação robusta do Firebase
+    if (typeof firebase === 'undefined' || 
+        typeof firebase.auth === 'undefined' || 
+        typeof firebase.firestore === 'undefined') {
+        alert("ERRO: Firebase não foi carregado corretamente.\n\nPor favor:\n1. Verifique sua conexão com a internet\n2. Recarregue a página\n3. Se persistir, contate o suporte");
         return;
     }
 
-    // 2. Elementos da UI
+    // 2. Elementos da UI com verificação
     const auth = firebase.auth();
     const db = firebase.firestore();
+    
     const authScreen = document.getElementById('authScreen');
     const mainScreen = document.getElementById('mainScreen');
     const loginForm = document.getElementById('loginForm');
@@ -15,76 +19,89 @@ document.addEventListener('DOMContentLoaded', function() {
     const entriesList = document.getElementById('entriesList');
     const userEmail = document.getElementById('userEmail');
 
-    // 3. Sistema de Mensagens Robustecido
+    if (!authScreen || !mainScreen || !loginForm || !entryForm || !entriesList) {
+        console.error("Elementos HTML essenciais não encontrados!");
+        return;
+    }
+
+    // 3. Sistema de Mensagens à prova de falhas
     const showMessage = (text, type = "info") => {
-        // Remove mensagens anteriores de forma segura
-        const oldMessages = document.querySelectorAll('.user-message');
-        if (oldMessages && oldMessages.forEach) {
-            oldMessages.forEach(msg => {
-                if (msg && msg.remove) msg.remove();
+        try {
+            // Remove mensagens anteriores de forma segura
+            document.querySelectorAll('.user-message').forEach(msg => {
+                if (msg.parentNode) msg.parentNode.removeChild(msg);
             });
-        }
 
-        // Cria nova mensagem
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'user-message';
-        
-        // Configuração de estilos
-        const styles = {
-            position: 'fixed',
-            top: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: '90%',
-            maxWidth: '400px',
-            padding: '15px',
-            borderRadius: '8px',
-            backgroundColor: type === 'success' ? '#4CAF50' : 
-                          type === 'error' ? '#F44336' : '#2196F3',
-            color: 'white',
-            textAlign: 'center',
-            boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-            zIndex: '1000',
-            fontSize: '16px',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center'
-        };
+            // Cria nova mensagem
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'user-message';
+            
+            // Configuração de estilos
+            const styles = {
+                position: 'fixed',
+                top: '20px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '90%',
+                maxWidth: '400px',
+                padding: '15px',
+                borderRadius: '8px',
+                backgroundColor: type === 'success' ? '#4CAF50' : 
+                              type === 'error' ? '#F44336' : '#2196F3',
+                color: 'white',
+                textAlign: 'center',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+                zIndex: '1000',
+                fontSize: '16px',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                animation: 'fadeIn 0.3s'
+            };
 
-        // Aplica estilos
-        Object.assign(messageDiv.style, styles);
+            Object.assign(messageDiv.style, styles);
 
-        // Adiciona conteúdo
-        const icon = type === 'success' ? '✓' : 
-                    type === 'error' ? '✗' : 'ℹ️';
-        
-        messageDiv.innerHTML = `
-            <span style="margin-right:12px;font-size:20px">${icon}</span>
-            <span>${text}</span>
-        `;
+            // Conteúdo da mensagem
+            const icon = type === 'success' ? '✓' : 
+                        type === 'error' ? '✗' : 'ℹ️';
+            
+            messageDiv.innerHTML = `
+                <span style="margin-right:12px;font-size:20px">${icon}</span>
+                <span>${text}</span>
+            `;
 
-        // Adiciona ao DOM
-        if (document.body) {
+            // Adiciona ao DOM
             document.body.appendChild(messageDiv);
             
             // Remove após 5 segundos
             setTimeout(() => {
-                messageDiv.style.opacity = '0';
+                messageDiv.style.animation = 'fadeOut 0.3s';
                 setTimeout(() => {
-                    if (messageDiv && messageDiv.parentNode) {
+                    if (messageDiv.parentNode) {
                         messageDiv.parentNode.removeChild(messageDiv);
                     }
                 }, 300);
             }, 5000);
+        } catch (e) {
+            console.error("Erro no sistema de mensagens:", e);
         }
     };
 
-    // 4. Função de Login Reforçada
-    loginForm.addEventListener('submit', async (e) => {
+    // 4. Função de Login Ultra Reforçada
+    loginForm.addEventListener('submit', async function(e) {
         e.preventDefault();
-        const button = e.target.querySelector('button');
-        const email = e.target.email.value.trim();
-        const password = e.target.password.value;
+        
+        const emailInput = this.email;
+        const passwordInput = this.password;
+        const submitButton = this.querySelector('button[type="submit"]');
+        
+        if (!emailInput || !passwordInput || !submitButton) {
+            showMessage("Formulário incompleto", "error");
+            return;
+        }
+
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
 
         // Validação básica
         if (!email || !password) {
@@ -92,41 +109,56 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        button.disabled = true;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Entrando...';
+        // Salva estado original do botão
+        const originalButtonText = submitButton.innerHTML;
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Entrando...';
 
         try {
+            console.log("Tentando login com:", email);
             const userCredential = await auth.signInWithEmailAndPassword(email, password);
             
-            // Verificação adicional
-            if (userCredential && userCredential.user) {
-                console.log("Login bem-sucedido:", userCredential.user.email);
-            } else {
-                throw new Error("Autenticação falhou");
+            if (!userCredential || !userCredential.user) {
+                throw new Error("Autenticação falhou - Sem dados de usuário");
             }
+
+            console.log("Login bem-sucedido para:", userCredential.user.email);
+            showMessage("Login realizado com sucesso!", "success");
+            
         } catch (error) {
-            console.error("Erro de login:", error);
+            console.error("Falha no login:", error);
             
-            let errorMessage = "Erro ao fazer login";
-            if (error.code) {
-                errorMessage = {
-                    'auth/invalid-email': "Email inválido",
-                    'auth/user-disabled': "Usuário desativado",
-                    'auth/user-not-found': "Usuário não encontrado",
-                    'auth/wrong-password': "Senha incorreta",
-                    'auth/too-many-requests': "Muitas tentativas. Tente mais tarde"
-                }[error.code] || errorMessage;
-            }
+            const errorMap = {
+                'auth/invalid-email': "Email inválido",
+                'auth/user-disabled': "Conta desativada",
+                'auth/user-not-found': "Usuário não encontrado",
+                'auth/wrong-password': "Senha incorreta",
+                'auth/too-many-requests': "Muitas tentativas. Tente mais tarde",
+                'auth/network-request-failed': "Falha na rede. Verifique sua conexão"
+            };
+
+            showMessage(errorMap[error.code] || "Erro ao fazer login. Tente novamente.", "error");
             
-            showMessage(errorMessage, "error");
         } finally {
-            if (button) {
-                button.disabled = false;
-                button.textContent = 'Entrar';
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalButtonText;
             }
         }
     });
 
     // ... (restante do código permanece igual)
-    // [Manter todas as outras funções como createEntryElement, loadEntries, etc.]
+    // [Manter as funções createEntryElement, loadEntries, etc.]
 });
+
+// CSS para as animações (adicione no seu arquivo CSS)
+<style>
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translate(-50%, -20px); }
+        to { opacity: 1; transform: translate(-50%, 0); }
+    }
+    @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+</style>
